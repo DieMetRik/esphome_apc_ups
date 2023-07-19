@@ -43,7 +43,8 @@ Cхема кабеля: http://www.apcupsd.org/manual/#id40
 
 Схема подключения:
 ![Image alt](https://github.com/DieMetRik/esphome_apc_ups/blob/main/image/APC-UPS.png)
-
+Кабель:
+![Image alt](https://github.com/DieMetRik/esphome_apc_ups/blob/main/image/940-0024C.png)
 Код для ESPhome в файле /esp32/ups-apc-protocol.yaml
 Папку /esp32/apc положить на сервер: /config/esphome/apc/
 
