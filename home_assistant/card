@@ -1,0 +1,64 @@
+type: vertical-stack
+cards:
+  - type: markdown
+    style: |
+      ha-card {
+        height: 28px !important;
+        text-align: center;
+        background: rgb(70, 18, 5);
+        color: white;
+        font-size: 1.5em;
+        font-family: sans-serif
+
+        }
+      ha-markdown.no-header {
+          padding-top: 5px !important;
+      }                                                    
+    content: __Бесперебойник APC__
+  - type: glance
+    entities:
+      - entity: sensor.ups_apc_protocol_status
+      - entity: sensor.ups_apc_protocol_input_voltage
+      - entity: sensor.ups_apc_protocol_output_voltage
+      - entity: sensor.ups_apc_protocol_battery_voltage
+      - entity: sensor.ups_apc_protocol_estimated_runtime
+    theme: default
+  - type: horizontal-stack
+    cards:
+      - type: gauge
+        entity: sensor.ups_apc_protocol_battery_level
+        max: 100
+        min: 0
+        name: Зарядка
+        severity:
+          green: 0
+          yellow: -30
+          red: -80
+      - type: gauge
+        entity: sensor.ups_apc_protocol_power_load
+        max: 100
+        min: 0
+        name: Нагрузка
+        severity:
+          green: 0
+          yellow: 70
+          red: 90
+      - type: gauge
+        entity: sensor.ups_apc_protocol_temperature
+        max: 60
+        min: 20
+        severity:
+          green: 36
+          yellow: 38
+          red: 40
+        name: 'Температура '
+  - entities:
+      - entity: sensor.ups_apc_protocol_last_updated_datetime
+        secondary_info: last-updated
+        name: Дата обновления
+      - entity: sensor.ups_apc_protocol_workonbattery_count
+        name: Кол-во циклов на батарее
+      - entity: sensor.ups_apc_protocol_last_cause
+      - entity: sensor.ups_apc_protocol_line_frequency
+    show_header_toggle: false
+    type: entities

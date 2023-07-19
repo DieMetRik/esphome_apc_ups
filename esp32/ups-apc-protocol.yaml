@@ -1,0 +1,289 @@
+substitutions:
+  device_name: "ups-apc-protocol"
+  device_ip: 192.168.1.137
+  device_description: "Мониторинг бесперебойника"
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+
+esphome:
+  name: ${device_name}
+  name_add_mac_suffix: false
+  includes:
+    - /config/esphome/apc/upc_apc.h #Указываем свой путь до файла
+  libraries:
+    - EEPROM
+
+  comment: ${device_description}
+  on_boot:
+    if:
+      condition:
+        time.has_time:
+      then:
+        - logger.log: Time has been set and is valid!
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+web_server:
+  port: 80
+  include_internal: true
+  auth:
+    username: !secret web_server_login
+    password: !secret web_server_password
+
+# Enable logging
+logger:
+  level: debug
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret encryption_key_ups_apt_protocol
+
+ota:
+  password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Optional manual IP
+  manual_ip:
+    static_ip: ${device_ip}
+    gateway: !secret wifi_gateway
+    subnet: !secret wifi_subnet
+    dns1: !secret wifi_dns1
+    dns2: !secret wifi_dns2
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: ${device_name}
+    password: !secret ap_password
+
+captive_portal:
+
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: Europe/Moscow
+
+text_sensor:
+  - platform: version
+    name: ${device_name}_version
+    hide_timestamp: true
+
+  - platform: template
+    name: ${device_name}_uptime
+    id: uptime_human
+    icon: mdi:clock-start
+
+  - platform: template
+    name: ${device_name}_status
+    id: Status
+    lambda: "return {};"
+
+  - platform: template     
+    id: last_updated_datetime
+    name: ${device_name}_last_updated_datetime
+    icon: mdi:clock-start
+
+    
+  - platform: template
+    name: ${device_name}_last_cause
+    id: Last_cause
+    lambda: "return {};"
+    on_raw_value:
+      then:
+      - text_sensor.template.publish:
+          id: last_updated_datetime
+          state:  !lambda |-
+              char str[25];
+              time_t currTime = id(sntp_time).now().timestamp;
+              strftime(str, sizeof(str), "%Y-%m-%d %H:%M:%S", localtime(&currTime));
+              //strftime(str, sizeof(str), "%Y-%m-%dT%H:%M:%S.000Z", gmtime(&currTime));
+              return (std::string) str;
+
+
+sensor:
+  - platform: wifi_signal
+    name: ${device_name}_wifi_signal
+    update_interval: 60s
+    entity_category: "diagnostic"
+    device_class: ""
+    unit_of_measurement: "%"
+    filters:
+      - calibrate_polynomial:
+          degree: 2
+          datapoints:
+              - -60.0 -> 67.0
+              - -59.0 -> 68.0
+              - -57.0 -> 71.0
+              - -56.0 -> 72.0
+              - -55.0 -> 73.0
+              - -30.0 -> 96.0
+              - -28.0 -> 98.0
+
+  - platform: uptime
+    name: ${device_name}_uptime
+    id: uptime_sensor
+    internal: true
+    on_raw_value:
+      then:
+        - text_sensor.template.publish:
+            id: uptime_human
+            state: !lambda |-
+              int seconds = round(id(uptime_sensor).raw_state);
+              int days = seconds / (24 * 3600);
+              seconds = seconds % (24 * 3600);
+              int hours = seconds / 3600;
+              seconds = seconds % 3600;
+              int minutes = seconds /  60;
+              seconds = seconds % 60;
+              return (
+                (days ? to_string(days) + "d " : "") +
+                (hours ? to_string(hours) + "h " : "") +
+                (minutes ? to_string(minutes) + "m " : "") +
+                (to_string(seconds) + "s")
+              ).c_str();
+
+  - platform: template #estimated_runtime
+    id: Estimated_runtime
+    name: ${device_name}_estimated_runtime
+    unit_of_measurement: "min"
+    accuracy_decimals: 0
+    lambda: "return {};"
+
+
+  - platform: template #Input_voltage
+    id: Input_voltage
+    name: ${device_name}_input_voltage
+    device_class: voltage
+    state_class: measurement
+
+    unit_of_measurement: "V"
+    accuracy_decimals: 1
+    lambda: "return {};"
+    
+  - platform: template #temperature
+    id: Temperature
+    name: ${device_name}_temperature
+    device_class: TEMPERATURE
+    state_class: measurement
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    lambda: "return {};"
+
+  - platform: template #battery_level
+    id: Battery_level
+    name: ${device_name}_battery_level
+    device_class: battery
+    state_class: measurement
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    lambda: "return {};"
+
+  - platform: template #power_load
+    id: Power_load
+    name: ${device_name}_power_load
+    device_class: power_factor
+    state_class: measurement
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    lambda: "return {};"
+
+  - platform: template #output_voltage
+    id: Output_voltage
+    name: ${device_name}_output_voltage
+    device_class: voltage
+    state_class: measurement
+    unit_of_measurement: "V"
+    accuracy_decimals: 1
+    lambda: "return {};"
+
+  - platform: template #output_voltage
+    id: Battery_voltage
+    name: ${device_name}_battery_voltage
+    device_class: voltage
+    state_class: measurement
+
+    unit_of_measurement: "V"
+    accuracy_decimals: 1
+    lambda: "return {};"
+
+  - platform: template #line_frequency
+    id: Line_frequency
+    name: ${device_name}_line_frequency
+    device_class: frequency
+    state_class: measurement
+    unit_of_measurement: "Hz"
+    accuracy_decimals: 2
+    lambda: "return {};"
+
+  - platform: template #line_frequency
+    id: WorkOnBattery_count
+    name: ${device_name}_workonbattery_count
+    accuracy_decimals: 0
+    lambda: "return {};"
+
+binary_sensor:
+  - platform: template #runtime_calibration
+    id: Runtime_calibration
+    name: ${device_name}_runtime_calibration
+    lambda: "return {};"
+
+  - platform: template #smart_trim
+    id: Smart_trim
+    name: ${device_name}_smart_trim
+    lambda: "return {};"
+
+  - platform: template #smart_boost
+    id: Smart_boost
+    name: ${device_name}_smart_boost
+    lambda: "return {};"
+    
+  - platform: template #on_line
+    id: On_line
+    name: ${device_name}_on_line
+    lambda: "return {};"
+    
+  - platform: template #on_battery
+    id: On_battery
+    name: ${device_name}_on_battery
+    lambda: "return {};"
+    
+  - platform: template #overloaded_output
+    id: Overloaded_output
+    name: ${device_name}_overloaded_output
+    lambda: "return {};"
+    
+  - platform: template #battery_low
+    id: Battery_low
+    name: ${device_name}_battery_low
+    lambda: "return {};"
+    
+  - platform: template #replace_battery
+    id: Replace_battery
+    name: ${device_name}_replace_battery
+    lambda: "return {};"
+    
+    
+
+uart:
+  id: uart_bus
+  tx_pin: ${tx_pin}
+  rx_pin: ${rx_pin}
+  baud_rate: 2400
+  debug:
+      direction: BOTH
+      dummy_receiver: false
+      sequence:
+        - lambda: UARTDebug::log_string(direction, bytes);
+
+custom_component: 
+
+  - lambda: |-
+      auto upc_apc = new Upcapc(id(uart_bus), id(Estimated_runtime), id(Input_voltage), id(Temperature), id(Battery_level), id(Power_load), id(Output_voltage), id(Battery_voltage), id(Line_frequency), id(Runtime_calibration), id(Smart_trim), id(Smart_boost), id(On_line), id(On_battery), id(Overloaded_output), id(Battery_low), id(Replace_battery), id(Last_cause), id(Status), id(WorkOnBattery_count));
+      App.register_component(upc_apc);
+      return {upc_apc};
