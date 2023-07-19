@@ -30,15 +30,15 @@ Cхема кабеля: http://www.apcupsd.org/manual/#id40
 * Кол-во переходов с ONLINE на ONBATT (Сохраняется в EEPROM)
 
 Использовал сделующие компоненты:
-* ESP32 30pin
+* ESP32 38pin
 * Logic Level shifter
 * TTL <-> RS232
 * DB9 male connector
 
 Покупал тут:
-* Esp32: https://aliexpress.ru/item/32864722159.htm
+* Esp32: https://aliexpress.ru/item/32864722159.html
 * Logic Level shifter: https://aliexpress.ru/item/32247463702.html
-* Вот эта у меня не заработала: https://pcus.ru/modul-preobrazovaniya-ttl-uart-v-rs232?search=uart-rs232
+* Вот эта у меня не заработала: https://pcus.ru/modul-preobrazovaniya-ttl-uart-v-rs232
 * А вот эта норм: https://pcus.ru/max3232-preobrazovatel-rs232-db9-uart-ttl
 
 Схема подключения:
