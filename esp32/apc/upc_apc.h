@@ -317,7 +317,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		{
 			double battery_voltage = byteToFloat(Re_buf,5);
 			std::fill_n(Re_buf, 30, 0);
-			if (battery_voltage > 0 && battery_voltage < 30){
+			if (battery_voltage > 0 && battery_voltage < 60){
 				if (Battery_voltage != nullptr) Battery_voltage->publish_state(battery_voltage);
 				error_cnt=0;
 				step=8; 
