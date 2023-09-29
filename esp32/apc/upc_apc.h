@@ -83,7 +83,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 	unsigned char params_temperature[1];		// C
 	unsigned char params_battery_level[1];		// f
 	unsigned char params_power_load[1];			// P
-	unsigned char params_output_voltage[1];		// o
+	unsigned char params_output_voltage[1];		// O = 4f
 	unsigned char params_battery_voltage[1]; 	// B
 	unsigned char params_estimated_runtime[1]; 	// j
 	unsigned char params_line_frequency[1]; 	// F 
@@ -148,7 +148,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		calculateParams(params_temperature, 0x43); 			// C
 		calculateParams(params_battery_level, 0x66);		// f
 		calculateParams(params_power_load, 0x50);			// P in %
-		calculateParams(params_output_voltage, 0x6f);		// o
+		calculateParams(params_output_voltage, 0x4f);		// O = 4f
 		calculateParams(params_battery_voltage, 0x42);		// B
 		calculateParams(params_line_frequency, 0x46); 		// F 
 
@@ -302,9 +302,9 @@ class Upcapc : public PollingComponent, public UARTDevice {
 			};
 		}
 	//output_voltage
-		if ((step == 6) && (Re_buf[3] == 0x0d) && (Re_buf[4] == 0x0a))	
+		if ((step == 6) && (Re_buf[5] == 0x0d) && (Re_buf[6] == 0x0a))	
 		{
-			double output_voltage = byteToFloat(Re_buf,3);
+			double output_voltage = byteToFloat(Re_buf,5);
 			std::fill_n(Re_buf, 30, 0);
 			if (output_voltage > 190 && output_voltage < 260){
 				if (Output_voltage != nullptr) Output_voltage->publish_state(output_voltage);
