@@ -10,6 +10,7 @@
 //namespace mercury {
 
 bool sw_selftest = false;
+bool run_calibration_sw = false;
 
 class Upcapc : public PollingComponent, public UARTDevice {
 	Sensor *Estimated_runtime {nullptr};
@@ -125,6 +126,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 	unsigned char params_grace_delay[1]; 		// p = 70
 	unsigned char params_wakeup_delay[1]; 		// r = 72
 	unsigned char params_sensitivity[1]; 		// s = 73
+	unsigned char params_run_calibration[1];	// D = 44	
 	
 	uint8_t Re_buf[40];
 	int counter = 0;
@@ -202,6 +204,9 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		calculateParams(params_grace_delay, 0x70);			// p = 70
 		calculateParams(params_wakeup_delay, 0x72);			// r = 72
 		calculateParams(params_sensitivity, 0x73);			// s = 73
+
+		calculateParams(params_run_calibration, 0x44);		// D = 44	
+
 
 
 		EEPROM.begin(EEPROM_SIZE);
@@ -309,9 +314,14 @@ class Upcapc : public PollingComponent, public UARTDevice {
 			b_self_test_progress = false;
 			st_cnt = 0;
 		}
+
 		
 //**************************** END SELF test section*********************************************		
-
+		if (step == 40) {
+			main_uart_read(params_run_calibration);			// Запуск самотестирования
+			step = 41;
+		}
+//**************************** END CALIBRATION*********************************************		
 
 		
 		if (step == 20) {
@@ -321,6 +331,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		counter = 0;
 		error_cnt++;
 		total_error_cnt++;
+
 //==========================================================================================================
 // ПРОВЕРКА ПОЛУЧЕНЫЙ ДАННЫХ
 		if ((step == 0) && (Re_buf[0] == 0x53) && (Re_buf[1] == 0x4d) && (Re_buf[2] == 0x0d) && (Re_buf[3] == 0x0a))		
@@ -564,7 +575,11 @@ class Upcapc : public PollingComponent, public UARTDevice {
 				}
 			};
 		}				
-		
+//******************************END MAIN SENSORS**************************************************************		
+
+
+//****************************** SELF TEST**************************************************************		
+
 		if (sw_selftest){ //request self test step
 			step=30; 
 			error_cnt=0;
@@ -578,7 +593,6 @@ class Upcapc : public PollingComponent, public UARTDevice {
 				b_self_test_progress = true;
 				step = 1;
 			}
-			
 		}
 		if ((step == 32) && (Re_buf[2] == 0x0d) && (Re_buf[3] == 0x0a))	{ //wait 60 sec after selt test
 			String st_result = "";
@@ -609,7 +623,26 @@ class Upcapc : public PollingComponent, public UARTDevice {
 			error_cnt=0;
 		}
 		if (Self_test_progress != nullptr) Self_test_progress->publish_state(b_self_test_progress);
+//******************************END SELF TEST**************************************************************		
+
 		
+//****************************** CALIBRATION**************************************************************		
+		if (run_calibration_sw){ //request self test step
+			step=40; 
+			error_cnt=0;
+			run_calibration_sw=false;
+		}
+		
+		if ((step == 41) && (Re_buf[1] == 0x0d) && (Re_buf[2] == 0x0a))	{ //wait OK from run calibration
+			if (Re_buf[0] == 0x21) {
+				std::fill_n(Re_buf, 30, 0);
+				error_cnt=0;
+				step = 1;
+			}
+		}
+		
+//****************************** END CALIBRATION**************************************************************		
+
 			
 					
 		if (error_cnt > 5){
@@ -668,6 +701,19 @@ class SelfTestSwitch : public Component, public Switch {
 	
 	void write_state(bool state) override {
 		sw_selftest = state;
+		publish_state(state);
+	};
+
+	
+};
+
+class Run_CalibrationSwitch : public Component, public Switch {
+	public:
+	void setup() override {
+	}
+	
+	void write_state(bool state) override {
+		run_calibration_sw = state;
 		publish_state(state);
 	};
 
