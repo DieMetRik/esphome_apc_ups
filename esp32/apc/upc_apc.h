@@ -38,6 +38,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 	Sensor *Grace_delay {nullptr};
 	Sensor *Wakeup_delay {nullptr};
 	TextSensor *Sensitivity {nullptr};
+	BinarySensor *Self_test_progress {nullptr};
 	
 	
 	public:
@@ -67,7 +68,8 @@ class Upcapc : public PollingComponent, public UARTDevice {
 	Sensor *sensor22,
 	Sensor *sensor23,
 	Sensor *sensor24,
-	TextSensor *sensor25
+	TextSensor *sensor25,
+	BinarySensor *sensor26
 	) : UARTDevice(parent), 
 	Estimated_runtime(sensor1),
 	Input_voltage(sensor2),
@@ -90,11 +92,11 @@ class Upcapc : public PollingComponent, public UARTDevice {
 	WorkOnBattery_count(sensor19),
 	Self_test_interval(sensor20),
 	St_result(sensor21),
-
 	Return_threshold(sensor22),
 	Grace_delay(sensor23),
 	Wakeup_delay(sensor24),
-	Sensitivity(sensor25)
+	Sensitivity(sensor25),
+	Self_test_progress(sensor26)
 	{}
 	
 	//int sw_Self_test;
@@ -136,7 +138,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 	int prev_step = 0;
 
 	int interval = 1000; 		// ИНТЕРВАЛ ОБНОВЛЕНИЯ
-
+	bool b_self_test_progress = false;	//self test in progress
 	bool wrk_on_btr = 0;
 	bool wrk_on_btr_trig = 0;
 	
@@ -285,29 +287,38 @@ class Upcapc : public PollingComponent, public UARTDevice {
 			main_uart_read(params_sensitivity);				// sensitivity
 		}
 		
-		
+//**************************** SELF test section*********************************************		
 		if (step == 30) {
 			main_uart_read(params_self_test_run);			// Запуск самотестирования
 			step = 31;
 		}
 		if (step == 32) {
-			st_cnt++;
-			ESP_LOGD("apc_ups", "%d", st_cnt);
-			if (st_cnt > 30) {
+			if ((st_cnt > 60) && b_self_test_progress) {
 				main_uart_read(params_self_test_read);			// Запуск самотестирования
 			}
-			else{error_cnt=0;}
-			if (st_cnt > 50) { step = 1;}
+			else{
+			step = 1;
+			}
+				
 		}
+		if (b_self_test_progress){
+			st_cnt++;
+			ESP_LOGD("apc_ups", "%d", st_cnt);
+		}
+		if ((st_cnt > 200) && b_self_test_progress) {
+			b_self_test_progress = false;
+			st_cnt = 0;
+		}
+		
+//**************************** END SELF test section*********************************************		
+
+
 		
 		if (step == 20) {
 			main_uart_read(params_bye);						// ПОКА
 		}
 		//ESP_LOGD("apc_ups", "%d %d %d", params_self_test_interval_set[0], params_self_test_interval_set[1],params_self_test_interval_set[2]);
-
 		counter = 0;
-		
-
 		error_cnt++;
 		total_error_cnt++;
 //==========================================================================================================
@@ -395,7 +406,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		{
 			double battery_voltage = byteToFloat(Re_buf,5);
 			std::fill_n(Re_buf, 30, 0);
-			if (battery_voltage > 0 && battery_voltage < 60){
+			if (battery_voltage > 0 && battery_voltage < 30){
 				if (Battery_voltage != nullptr) Battery_voltage->publish_state(battery_voltage);
 				error_cnt=0;
 				step=8; 
@@ -545,40 +556,49 @@ class Upcapc : public PollingComponent, public UARTDevice {
 				total_error_cnt=0;
 				status = "ONLINE";
 				error_cnt=0;
-				step=1; 
+				if (b_self_test_progress){
+					step=32; 
+				}
+				else{
+					step=1; 
+				}
 			};
 		}				
 		
-		
-		
-		
-		if (sw_selftest){
+		if (sw_selftest){ //request self test step
 			step=30; 
 			error_cnt=0;
 			sw_selftest=false;
 		}
 		
-		if ((step == 31) && (Re_buf[2] == 0x0d) && (Re_buf[3] == 0x0a))	{
+		if ((step == 31) && (Re_buf[2] == 0x0d) && (Re_buf[3] == 0x0a))	{ //wait OK from start self sheck
 			if ((Re_buf[0] == 0x4f) && (Re_buf[1] == 0x4b)) {
 				std::fill_n(Re_buf, 30, 0);
 				error_cnt=0;
-				step = 32;
+				b_self_test_progress = true;
+				step = 1;
 			}
 			
 		}
-		if ((step == 32) && (Re_buf[2] == 0x0d) && (Re_buf[3] == 0x0a))	{
+		if ((step == 32) && (Re_buf[2] == 0x0d) && (Re_buf[3] == 0x0a))	{ //wait 60 sec after selt test
 			String st_result = "";
 			
 			if ((Re_buf[0] == 0x4f) && (Re_buf[1] == 0x4b)) {
 				st_result = "OK";
+				b_self_test_progress = false;
+				st_cnt = 0;
 				step = 1;
 			}
 			if ((Re_buf[0] == 0x42) && (Re_buf[1] == 0x54)) {
 				st_result = "Battery Fault";
+				b_self_test_progress = false;
+				st_cnt = 0;
 				step = 1;
 			}
 			if ((Re_buf[0] == 0x4e) && (Re_buf[1] == 0x47)) {
 				st_result = "Overload";
+				b_self_test_progress = false;
+				st_cnt = 0;
 				step = 1;
 			}
 			if ((Re_buf[0] == 0x4e) && (Re_buf[1] == 0x4f)) {
@@ -588,6 +608,8 @@ class Upcapc : public PollingComponent, public UARTDevice {
 			std::fill_n(Re_buf, 30, 0);
 			error_cnt=0;
 		}
+		if (Self_test_progress != nullptr) Self_test_progress->publish_state(b_self_test_progress);
+		
 			
 					
 		if (error_cnt > 5){

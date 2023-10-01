@@ -314,6 +314,11 @@ binary_sensor:
     id: Replace_battery
     name: ${device_name}_replace_battery
     lambda: "return {};"
+
+  - platform: template #self_test_progress
+    id: self_test_progress
+    name: ${device_name}_self_test_progress
+    lambda: "return {};"
     
 switch:
   - platform: custom
@@ -343,6 +348,6 @@ uart:
 custom_component: 
 
   - lambda: |-
-      auto upc_apc = new Upcapc(id(uart_bus), id(Estimated_runtime), id(Input_voltage), id(Temperature), id(Battery_level), id(Power_load), id(Output_voltage), id(Battery_voltage), id(Line_frequency), id(Runtime_calibration), id(Smart_trim), id(Smart_boost), id(On_line), id(On_battery), id(Overloaded_output), id(Battery_low), id(Replace_battery), id(Last_cause), id(Status), id(WorkOnBattery_count), id(self_test_interval), id(self_test_result),id(return_threshold),id(grace_delay),id(wakeup_delay),id(sensitivity));
+      auto upc_apc = new Upcapc(id(uart_bus), id(Estimated_runtime), id(Input_voltage), id(Temperature), id(Battery_level), id(Power_load), id(Output_voltage), id(Battery_voltage), id(Line_frequency), id(Runtime_calibration), id(Smart_trim), id(Smart_boost), id(On_line), id(On_battery), id(Overloaded_output), id(Battery_low), id(Replace_battery), id(Last_cause), id(Status), id(WorkOnBattery_count), id(self_test_interval), id(self_test_result),id(return_threshold),id(grace_delay),id(wakeup_delay),id(sensitivity),id(self_test_progress));
       App.register_component(upc_apc);
       return {upc_apc};
