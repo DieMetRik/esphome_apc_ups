@@ -89,6 +89,26 @@ text_sensor:
     name: ${device_name}_last_updated_datetime
     icon: mdi:clock-start
 
+  - platform: template     
+    id: sensitivity
+    name: ${device_name}_sensitivity
+    icon: mdi:clock-start
+
+  - platform: template
+    name: ${device_name}_self_test_result
+    id: self_test_result
+    lambda: "return {};"
+    on_raw_value:
+      then:
+      - text_sensor.template.publish:
+          id: last_self_test_datetime
+          state:  !lambda |-
+              char str[25];
+              time_t currTime = id(sntp_time).now().timestamp;
+              strftime(str, sizeof(str), "%Y-%m-%d %H:%M:%S", localtime(&currTime));
+              //strftime(str, sizeof(str), "%Y-%m-%dT%H:%M:%S.000Z", gmtime(&currTime));
+              return (std::string) str;
+
     
   - platform: template
     name: ${device_name}_last_cause
@@ -227,6 +247,33 @@ sensor:
     accuracy_decimals: 0
     lambda: "return {};"
 
+  - platform: template #self_test_interval
+    id: self_test_interval
+    name: ${device_name}_self_test_interval
+    accuracy_decimals: 0
+    lambda: "return {};"
+
+  - platform: template #return_threshold
+    id: return_threshold
+    name: ${device_name}_return_threshold
+    accuracy_decimals: 0
+    unit_of_measurement: "%"
+    lambda: "return {};"
+
+  - platform: template #grace_delay
+    id: grace_delay
+    name: ${device_name}_grace_delay
+    accuracy_decimals: 0
+    unit_of_measurement: "sec"
+    lambda: "return {};"
+
+  - platform: template #wakeup_delay
+    id: wakeup_delay
+    name: ${device_name}_wakeup_delay
+    accuracy_decimals: 0
+    unit_of_measurement: "sec"
+    lambda: "return {};"
+
 binary_sensor:
   - platform: template #runtime_calibration
     id: Runtime_calibration
@@ -268,7 +315,19 @@ binary_sensor:
     name: ${device_name}_replace_battery
     lambda: "return {};"
     
-    
+switch:
+  - platform: custom
+    lambda: |-
+      auto self_test_switch = new SelfTestSwitch();
+      App.register_component(self_test_switch);
+      return {self_test_switch};
+    switches:
+      name: ${device_name}_self_test
+      id: self_test
+      on_turn_on:
+      - delay: 1s
+      - switch.turn_off:
+          id: self_test    
 
 uart:
   id: uart_bus
@@ -284,6 +343,6 @@ uart:
 custom_component: 
 
   - lambda: |-
-      auto upc_apc = new Upcapc(id(uart_bus), id(Estimated_runtime), id(Input_voltage), id(Temperature), id(Battery_level), id(Power_load), id(Output_voltage), id(Battery_voltage), id(Line_frequency), id(Runtime_calibration), id(Smart_trim), id(Smart_boost), id(On_line), id(On_battery), id(Overloaded_output), id(Battery_low), id(Replace_battery), id(Last_cause), id(Status), id(WorkOnBattery_count));
+      auto upc_apc = new Upcapc(id(uart_bus), id(Estimated_runtime), id(Input_voltage), id(Temperature), id(Battery_level), id(Power_load), id(Output_voltage), id(Battery_voltage), id(Line_frequency), id(Runtime_calibration), id(Smart_trim), id(Smart_boost), id(On_line), id(On_battery), id(Overloaded_output), id(Battery_low), id(Replace_battery), id(Last_cause), id(Status), id(WorkOnBattery_count), id(self_test_interval), id(self_test_result),id(return_threshold),id(grace_delay),id(wakeup_delay),id(sensitivity));
       App.register_component(upc_apc);
       return {upc_apc};

@@ -6,7 +6,10 @@
 #include "EEPROM.h"
 #define EEPROM_SIZE 8
 
+//namespace esphome {
+//namespace mercury {
 
+bool sw_selftest = false;
 
 class Upcapc : public PollingComponent, public UARTDevice {
 	Sensor *Estimated_runtime {nullptr};
@@ -28,6 +31,14 @@ class Upcapc : public PollingComponent, public UARTDevice {
 	TextSensor *Last_cause {nullptr};
 	TextSensor *Status {nullptr};
 	Sensor *WorkOnBattery_count {nullptr};
+	Sensor *Self_test_interval {nullptr};
+	TextSensor *St_result {nullptr};
+
+	Sensor *Return_threshold {nullptr};
+	Sensor *Grace_delay {nullptr};
+	Sensor *Wakeup_delay {nullptr};
+	TextSensor *Sensitivity {nullptr};
+	
 	
 	public:
 	Upcapc(
@@ -50,7 +61,13 @@ class Upcapc : public PollingComponent, public UARTDevice {
 	BinarySensor *sensor16,
 	TextSensor *sensor17,
 	TextSensor *sensor18,
-	Sensor *sensor19
+	Sensor *sensor19,
+	Sensor *sensor20,
+	TextSensor *sensor21,
+	Sensor *sensor22,
+	Sensor *sensor23,
+	Sensor *sensor24,
+	TextSensor *sensor25
 	) : UARTDevice(parent), 
 	Estimated_runtime(sensor1),
 	Input_voltage(sensor2),
@@ -70,8 +87,17 @@ class Upcapc : public PollingComponent, public UARTDevice {
 	Replace_battery(sensor16),
 	Last_cause(sensor17),
 	Status(sensor18),
-	WorkOnBattery_count(sensor19){}
+	WorkOnBattery_count(sensor19),
+	Self_test_interval(sensor20),
+	St_result(sensor21),
 
+	Return_threshold(sensor22),
+	Grace_delay(sensor23),
+	Wakeup_delay(sensor24),
+	Sensitivity(sensor25)
+	{}
+	
+	//int sw_Self_test;
 //common
 	unsigned char params_smart_mode[1];			// Y
 	unsigned char params_status[1];				// Q
@@ -89,13 +115,22 @@ class Upcapc : public PollingComponent, public UARTDevice {
 	unsigned char params_line_frequency[1]; 	// F 
 //Text sensor
 	unsigned char params_last_cause[1]; 		// G
+	unsigned char params_self_test_interval[1]; // E
+	unsigned char params_self_test_run[1]; 		// W = 57
+	unsigned char params_self_test_read[1];		// X = 58
+	
+	unsigned char params_return_threshold[1]; 	// e = 65
+	unsigned char params_grace_delay[1]; 		// p = 70
+	unsigned char params_wakeup_delay[1]; 		// r = 72
+	unsigned char params_sensitivity[1]; 		// s = 73
 	
 	uint8_t Re_buf[40];
 	int counter = 0;
-	
+
 	String status = "OFFLINE";
 	
 	int error_cnt = 0;
+	int st_cnt = 0; //self test counter
 	int total_error_cnt = 0;
 	int step = 0;
 	int prev_step = 0;
@@ -113,8 +148,8 @@ class Upcapc : public PollingComponent, public UARTDevice {
 	void calculateParams(unsigned char *frame, unsigned char comm)
 	{
 		frame[0] = comm;
-
 	}
+
 //=======================================================
 	double byteToFloat (uint8_t buf[], int cnt)
 	{
@@ -148,7 +183,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		calculateParams(params_temperature, 0x43); 			// C
 		calculateParams(params_battery_level, 0x66);		// f
 		calculateParams(params_power_load, 0x50);			// P in %
-		calculateParams(params_output_voltage, 0x4f);		// O = 4f
+		calculateParams(params_output_voltage, 0x4f);		// O
 		calculateParams(params_battery_voltage, 0x42);		// B
 		calculateParams(params_line_frequency, 0x46); 		// F 
 
@@ -157,10 +192,21 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		
 		calculateParams(params_smart_mode, 0x59); 			// Y
 		calculateParams(params_bye, 0x52);					// R
+		calculateParams(params_self_test_interval, 0x45);	// E
+		calculateParams(params_self_test_run, 0x57);		// W = 57
+		calculateParams(params_self_test_read, 0x58);		// X = 58
+
+		calculateParams(params_return_threshold, 0x65);		// e = 65
+		calculateParams(params_grace_delay, 0x70);			// p = 70
+		calculateParams(params_wakeup_delay, 0x72);			// r = 72
+		calculateParams(params_sensitivity, 0x73);			// s = 73
+
+
 		EEPROM.begin(EEPROM_SIZE);
 		workonbattery_count = EEPROM.readInt(address);
 	}
-
+	
+	
 	void loop() override {}
 
 	void main_uart_read(uint8_t *command)
@@ -222,10 +268,42 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		if (step == 10) {
 			main_uart_read(params_last_cause);				// Последний случай отключения
 		}
+		if (step == 11) {
+			main_uart_read(params_self_test_interval);		// Время самотестирования
+		}
 
+		if (step == 12) {
+			main_uart_read(params_return_threshold);		// Время возвращения
+		}
+		if (step == 13) {
+			main_uart_read(params_grace_delay);				// Время в секундах ухода в soft shutdown
+		}
+		if (step == 14) {
+			main_uart_read(params_wakeup_delay);			// wakeup_delay
+		}
+		if (step == 15) {
+			main_uart_read(params_sensitivity);				// sensitivity
+		}
+		
+		
+		if (step == 30) {
+			main_uart_read(params_self_test_run);			// Запуск самотестирования
+			step = 31;
+		}
+		if (step == 32) {
+			st_cnt++;
+			ESP_LOGD("apc_ups", "%d", st_cnt);
+			if (st_cnt > 30) {
+				main_uart_read(params_self_test_read);			// Запуск самотестирования
+			}
+			else{error_cnt=0;}
+			if (st_cnt > 50) { step = 1;}
+		}
+		
 		if (step == 20) {
 			main_uart_read(params_bye);						// ПОКА
 		}
+		//ESP_LOGD("apc_ups", "%d %d %d", params_self_test_interval_set[0], params_self_test_interval_set[1],params_self_test_interval_set[2]);
 
 		counter = 0;
 		
@@ -389,12 +467,129 @@ class Upcapc : public PollingComponent, public UARTDevice {
 			if (last_cause != ""){
 				if (Last_cause != nullptr) Last_cause->publish_state(last_cause.c_str());
 				error_cnt=0;
-				total_error_cnt=0;
-				status = "ONLINE";
-				step=1; 
+				step=11; 
+			};
+		}	
+		//params_self_test_interval
+		if ((step == 11) && (Re_buf[3] == 0x0d) && (Re_buf[4] == 0x0a))	
+		{
+			double self_test_interval = -1;
+			if (Re_buf[0] == 0x4f) {
+				self_test_interval = 0;
+			}
+			else
+			{
+				byteToFloat(Re_buf,3);
+			}
+			
+			std::fill_n(Re_buf, 30, 0);
+			if (self_test_interval >= 0 && self_test_interval < 1000){
+				if (Self_test_interval != nullptr) Self_test_interval->publish_state(self_test_interval);
+				step = 12;
+				error_cnt=0;
 			};
 		}	
 		
+	//return_threshold
+		if ((step == 12) && (Re_buf[2] == 0x0d) && (Re_buf[3] == 0x0a))	
+		{
+			int return_threshold = byteToInt(Re_buf,2);
+			std::fill_n(Re_buf, 30, 0);
+			if (return_threshold > 0 && return_threshold < 1000){
+				if (Return_threshold != nullptr) Return_threshold->publish_state(return_threshold);
+				error_cnt=0;
+				step=13; 
+			};
+		}				
+		
+	//grace_delay
+		if ((step == 13) && (Re_buf[3] == 0x0d) && (Re_buf[4] == 0x0a))	
+		{
+			int grace_delay = byteToInt(Re_buf,3);
+			std::fill_n(Re_buf, 30, 0);
+			if (grace_delay > 0 && grace_delay < 1000){
+				if (Grace_delay != nullptr) Grace_delay->publish_state(grace_delay);
+				error_cnt=0;
+				step=14; 
+			};
+		}			
+	//wakeup_delay
+		if ((step == 14) && (Re_buf[3] == 0x0d) && (Re_buf[4] == 0x0a))	
+		{
+			int wakeup_delay = byteToInt(Re_buf,3);
+			std::fill_n(Re_buf, 30, 0);
+			if (wakeup_delay > 0 && wakeup_delay < 1000){
+				if (Wakeup_delay != nullptr) Wakeup_delay->publish_state(wakeup_delay);
+				error_cnt=0;
+				step=15; 
+			};
+		}					
+	//sensitivity
+		if ((step == 15) && (Re_buf[1] == 0x0d) && (Re_buf[2] == 0x0a))	
+		{
+			uint8_t temp_cause = Re_buf[0];
+			String sensitivity = "";
+			std::fill_n(Re_buf, 30, 0);
+			switch(temp_cause) {
+				case 0x48: sensitivity = "Highest";
+				break;
+				case 0x4d: sensitivity = "Medium";
+				break;
+				case 0x4c: sensitivity = "Lowest";
+				break;
+				case 0x41: sensitivity = "Autoadjust";
+				break;
+			}
+			if (sensitivity != ""){
+				if (Sensitivity != nullptr) Sensitivity->publish_state(sensitivity.c_str());
+				total_error_cnt=0;
+				status = "ONLINE";
+				error_cnt=0;
+				step=1; 
+			};
+		}				
+		
+		
+		
+		
+		if (sw_selftest){
+			step=30; 
+			error_cnt=0;
+			sw_selftest=false;
+		}
+		
+		if ((step == 31) && (Re_buf[2] == 0x0d) && (Re_buf[3] == 0x0a))	{
+			if ((Re_buf[0] == 0x4f) && (Re_buf[1] == 0x4b)) {
+				std::fill_n(Re_buf, 30, 0);
+				error_cnt=0;
+				step = 32;
+			}
+			
+		}
+		if ((step == 32) && (Re_buf[2] == 0x0d) && (Re_buf[3] == 0x0a))	{
+			String st_result = "";
+			
+			if ((Re_buf[0] == 0x4f) && (Re_buf[1] == 0x4b)) {
+				st_result = "OK";
+				step = 1;
+			}
+			if ((Re_buf[0] == 0x42) && (Re_buf[1] == 0x54)) {
+				st_result = "Battery Fault";
+				step = 1;
+			}
+			if ((Re_buf[0] == 0x4e) && (Re_buf[1] == 0x47)) {
+				st_result = "Overload";
+				step = 1;
+			}
+			if ((Re_buf[0] == 0x4e) && (Re_buf[1] == 0x4f)) {
+				st_result = "No Result";
+			}
+			if (St_result != nullptr) St_result->publish_state(st_result.c_str());
+			std::fill_n(Re_buf, 30, 0);
+			error_cnt=0;
+		}
+			
+					
 		if (error_cnt > 5){
 			error_cnt=0;
 			step=0;
@@ -443,3 +638,17 @@ class Upcapc : public PollingComponent, public UARTDevice {
 
 	};
 };
+
+class SelfTestSwitch : public Component, public Switch {
+	public:
+	void setup() override {
+	}
+	
+	void write_state(bool state) override {
+		sw_selftest = state;
+		publish_state(state);
+	};
+
+	
+};
+
