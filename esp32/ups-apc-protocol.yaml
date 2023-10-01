@@ -333,7 +333,18 @@ switch:
       - delay: 1s
       - switch.turn_off:
           id: self_test    
-
+  - platform: custom
+    lambda: |-
+      auto run_calibration_switch = new Run_CalibrationSwitch();
+      App.register_component(run_calibration_switch);
+      return {run_calibration_switch};
+    switches:
+      name: ${device_name}_run_calibration
+      id: run_calibration
+      on_turn_on:
+      - delay: 1s
+      - switch.turn_off:
+          id: run_calibration
 uart:
   id: uart_bus
   tx_pin: ${tx_pin}
