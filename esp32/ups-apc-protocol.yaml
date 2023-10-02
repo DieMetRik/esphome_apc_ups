@@ -94,6 +94,11 @@ text_sensor:
     name: ${device_name}_sensitivity
     icon: mdi:clock-start
 
+  - platform: template     
+    id: last_self_test_datetime
+    name: ${device_name}_last_self_test_datetime
+    icon: mdi:clock-start
+
   - platform: template
     name: ${device_name}_self_test_result
     id: self_test_result

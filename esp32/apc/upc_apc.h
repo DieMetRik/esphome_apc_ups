@@ -441,14 +441,14 @@ class Upcapc : public PollingComponent, public UARTDevice {
 			
 			std::fill_n(Re_buf, 30, 0);
 			//uint8_t read_status = 
-			bool runtime_calibration = bitRead(status, 0);
+			bool runtime_calibration = bitRead(status, 0); //CHECKED
 			bool smart_trim = bitRead(status, 4);  // ИЗМЕНЕНО
 			bool smart_boost = bitRead(status, 2);
 			bool on_line = bitRead(status, 3);
 			bool on_battery = bitRead(status, 1); // ИЗМЕНЕНО
 			wrk_on_btr = on_battery;
 			bool overloaded_output = bitRead(status, 5);
-			bool battery_low = bitRead(status, 6);
+			bool battery_low = bitRead(status, 6); //CHEKED
 			bool replace_battery = bitRead(status, 7);
 			
 			if (status > 0){
