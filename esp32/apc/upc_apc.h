@@ -153,8 +153,25 @@ class Upcapc : public PollingComponent, public UARTDevice {
 	{
 		frame[0] = comm;
 	}
-
 //=======================================================
+	int string2hex(char *s, uint8_t cnt){
+		int x = 0;
+		for(int i = 0;cnt;i++) {
+			char c = *s;
+			if (c >= '0' && c <= '9') {
+				x *= 16;
+				x += c - '0'; 
+			}
+			else if (c >= 'A' && c <= 'F') {
+				x *= 16;
+				x += (c - 'A') + 10; 
+			}
+			else break;
+				s++;
+		}
+		return x;
+	}
+	
 	double byteToFloat (uint8_t buf[], int cnt)
 	{
 		uint8_t tmp_buf[10];
@@ -437,18 +454,17 @@ class Upcapc : public PollingComponent, public UARTDevice {
 	//status bits
 		if ((step == 9) && (Re_buf[2] == 0x0d) && (Re_buf[3] == 0x0a))	
 		{
-			int status = byteToInt(Re_buf, 2);
-			
+			int status = string2hex((char*)Re_buf, 1);
 			std::fill_n(Re_buf, 30, 0);
 			//uint8_t read_status = 
-			bool runtime_calibration = bitRead(status, 0); //CHECKED
-			bool smart_trim = bitRead(status, 4);  // ИЗМЕНЕНО
+			bool runtime_calibration = bitRead(status, 0); 
+			bool smart_trim = bitRead(status, 1);  
 			bool smart_boost = bitRead(status, 2);
 			bool on_line = bitRead(status, 3);
-			bool on_battery = bitRead(status, 1); // ИЗМЕНЕНО
+			bool on_battery = bitRead(status, 4); 
 			wrk_on_btr = on_battery;
 			bool overloaded_output = bitRead(status, 5);
-			bool battery_low = bitRead(status, 6); //CHEKED
+			bool battery_low = bitRead(status, 6); 
 			bool replace_battery = bitRead(status, 7);
 			
 			if (status > 0){
@@ -501,7 +517,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 			}
 			else
 			{
-				byteToFloat(Re_buf,3);
+				self_test_interval = byteToInt(Re_buf,3);
 			}
 			
 			std::fill_n(Re_buf, 30, 0);
@@ -517,7 +533,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		{
 			int return_threshold = byteToInt(Re_buf,2);
 			std::fill_n(Re_buf, 30, 0);
-			if (return_threshold > 0 && return_threshold < 1000){
+			if (return_threshold >= 0 && return_threshold < 1000){
 				if (Return_threshold != nullptr) Return_threshold->publish_state(return_threshold);
 				error_cnt=0;
 				step=13; 
@@ -529,7 +545,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		{
 			int grace_delay = byteToInt(Re_buf,3);
 			std::fill_n(Re_buf, 30, 0);
-			if (grace_delay > 0 && grace_delay < 1000){
+			if (grace_delay >= 0 && grace_delay < 1000){
 				if (Grace_delay != nullptr) Grace_delay->publish_state(grace_delay);
 				error_cnt=0;
 				step=14; 
@@ -540,7 +556,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		{
 			int wakeup_delay = byteToInt(Re_buf,3);
 			std::fill_n(Re_buf, 30, 0);
-			if (wakeup_delay > 0 && wakeup_delay < 1000){
+			if (wakeup_delay >= 0 && wakeup_delay < 1000){
 				if (Wakeup_delay != nullptr) Wakeup_delay->publish_state(wakeup_delay);
 				error_cnt=0;
 				step=15; 
