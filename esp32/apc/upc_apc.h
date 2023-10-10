@@ -388,7 +388,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		{
 			double temperature = byteToFloat(Re_buf,5);
 			std::fill_n(Re_buf, 30, 0);
-			if (temperature > 10 && temperature < 50){
+			if (temperature > 2 && temperature < 50){
 	
 				if (Temperature != nullptr) Temperature->publish_state(temperature);
 				error_cnt=0;
