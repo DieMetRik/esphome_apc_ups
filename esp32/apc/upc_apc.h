@@ -364,7 +364,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		{
 			double estimated_runtime = byteToFloat(Re_buf,4);
 			std::fill_n(Re_buf, 30, 0);
-			if (estimated_runtime > 0 && estimated_runtime < 100){
+			if (estimated_runtime > 0 && estimated_runtime < 1000){
 				if (Estimated_runtime != nullptr) Estimated_runtime->publish_state(estimated_runtime);
 				error_cnt=0;
 				step=2;
@@ -400,7 +400,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		{
 			double battery_level = byteToFloat(Re_buf,5);
 			std::fill_n(Re_buf, 30, 0);
-			if (battery_level > 1 && battery_level < 101){
+			if (battery_level >= 0 && battery_level < 101){
 				if (Battery_level != nullptr) Battery_level->publish_state(battery_level);
 				error_cnt=0;
 				step=5;
@@ -412,7 +412,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		{
 			double power_load = byteToFloat(Re_buf,5);
 			std::fill_n(Re_buf, 30, 0);
-			if (power_load > 1 && power_load < 101){
+			if (power_load >= 0 && power_load < 101){
 				if (Power_load != nullptr) Power_load->publish_state(power_load);
 				error_cnt=0;
 				step=6;
@@ -423,7 +423,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		{
 			double output_voltage = byteToFloat(Re_buf,5);
 			std::fill_n(Re_buf, 30, 0);
-			if (output_voltage > 190 && output_voltage < 260){
+			if (output_voltage > 100 && output_voltage < 290){
 				if (Output_voltage != nullptr) Output_voltage->publish_state(output_voltage);
 				error_cnt=0;
 				step=7; 
@@ -434,7 +434,7 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		{
 			double battery_voltage = byteToFloat(Re_buf,5);
 			std::fill_n(Re_buf, 30, 0);
-			if (battery_voltage > 0 && battery_voltage < 100){
+			if (battery_voltage > 0 && battery_voltage < 290){
 				if (Battery_voltage != nullptr) Battery_voltage->publish_state(battery_voltage);
 				error_cnt=0;
 				step=8; 
