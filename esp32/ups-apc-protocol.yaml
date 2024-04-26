@@ -29,6 +29,7 @@ esp32:
 web_server:
   port: 80
   include_internal: true
+  version: 3
   auth:
     username: !secret web_server_login
     password: !secret web_server_password
@@ -66,6 +67,7 @@ captive_portal:
 
 time:
   - platform: sntp
+    servers: "192.168.1.30"
     id: sntp_time
     timezone: Europe/Moscow
 
@@ -90,13 +92,13 @@ text_sensor:
     icon: mdi:clock-start
 
   - platform: template     
-    id: sensitivity
-    name: ${device_name}_sensitivity
+    id: last_self_test_datetime
+    name: ${device_name}_last_self_test_datetime
     icon: mdi:clock-start
 
   - platform: template     
-    id: last_self_test_datetime
-    name: ${device_name}_last_self_test_datetime
+    id: sensitivity
+    name: ${device_name}_sensitivity
     icon: mdi:clock-start
 
   - platform: template
@@ -113,7 +115,6 @@ text_sensor:
               strftime(str, sizeof(str), "%Y-%m-%d %H:%M:%S", localtime(&currTime));
               //strftime(str, sizeof(str), "%Y-%m-%dT%H:%M:%S.000Z", gmtime(&currTime));
               return (std::string) str;
-
     
   - platform: template
     name: ${device_name}_last_cause
@@ -232,7 +233,6 @@ sensor:
     name: ${device_name}_battery_voltage
     device_class: voltage
     state_class: measurement
-
     unit_of_measurement: "V"
     accuracy_decimals: 1
     lambda: "return {};"
@@ -279,6 +279,31 @@ sensor:
     unit_of_measurement: "sec"
     lambda: "return {};"
 
+output:
+- platform: custom
+  type: float
+  lambda: |-
+    auto my_custom_float_output = new MyCustomFloatOutput();
+    App.register_component(my_custom_float_output);
+    return {my_custom_float_output};
+  outputs:
+    id: custom_float
+
+number:
+  - platform: template
+    id: update_interval
+    name: "Update interval"
+    unit_of_measurement: 'ms'
+    min_value: 500
+    max_value: 30000
+    restore_value: true
+    optimistic: true
+    step: 100 
+    on_value:
+      - output.set_level: 
+          id: custom_float
+          level: !lambda return x/100000;
+
 binary_sensor:
   - platform: template #runtime_calibration
     id: Runtime_calibration
@@ -324,7 +349,7 @@ binary_sensor:
     id: self_test_progress
     name: ${device_name}_self_test_progress
     lambda: "return {};"
-    
+
 switch:
   - platform: custom
     lambda: |-
@@ -337,7 +362,8 @@ switch:
       on_turn_on:
       - delay: 1s
       - switch.turn_off:
-          id: self_test    
+          id: self_test
+
   - platform: custom
     lambda: |-
       auto run_calibration_switch = new Run_CalibrationSwitch();
@@ -350,6 +376,12 @@ switch:
       - delay: 1s
       - switch.turn_off:
           id: run_calibration
+
+button:
+  - platform: restart
+    id: restart_esp
+    name: "Apply update interval"
+
 uart:
   id: uart_bus
   tx_pin: ${tx_pin}
@@ -362,7 +394,6 @@ uart:
         - lambda: UARTDebug::log_string(direction, bytes);
 
 custom_component: 
-
   - lambda: |-
       auto upc_apc = new Upcapc(id(uart_bus), id(Estimated_runtime), id(Input_voltage), id(Temperature), id(Battery_level), id(Power_load), id(Output_voltage), id(Battery_voltage), id(Line_frequency), id(Runtime_calibration), id(Smart_trim), id(Smart_boost), id(On_line), id(On_battery), id(Overloaded_output), id(Battery_low), id(Replace_battery), id(Last_cause), id(Status), id(WorkOnBattery_count), id(self_test_interval), id(self_test_result),id(return_threshold),id(grace_delay),id(wakeup_delay),id(sensitivity),id(self_test_progress));
       App.register_component(upc_apc);

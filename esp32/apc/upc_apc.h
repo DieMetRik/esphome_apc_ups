@@ -11,6 +11,7 @@
 
 bool sw_selftest = false;
 bool run_calibration_sw = false;
+int interval_ups;
 
 class Upcapc : public PollingComponent, public UARTDevice {
 	Sensor *Estimated_runtime {nullptr};
@@ -40,7 +41,6 @@ class Upcapc : public PollingComponent, public UARTDevice {
 	Sensor *Wakeup_delay {nullptr};
 	TextSensor *Sensitivity {nullptr};
 	BinarySensor *Self_test_progress {nullptr};
-	
 	
 	public:
 	Upcapc(
@@ -127,7 +127,6 @@ class Upcapc : public PollingComponent, public UARTDevice {
 	unsigned char params_wakeup_delay[1]; 		// r = 72
 	unsigned char params_sensitivity[1]; 		// s = 73
 	unsigned char params_run_calibration[1];	// D = 44	
-	
 	uint8_t Re_buf[40];
 	int counter = 0;
 
@@ -139,7 +138,6 @@ class Upcapc : public PollingComponent, public UARTDevice {
 	int step = 0;
 	int prev_step = 0;
 
-	int interval = 1000; 		// Ð˜ÐÐ¢Ð•Ð Ð’ÐÐ› ÐžÐ‘ÐÐžÐ’Ð›Ð•ÐÐ˜Ð¯
 	bool b_self_test_progress = false;	//self test in progress
 	bool wrk_on_btr = 0;
 	bool wrk_on_btr_trig = 0;
@@ -147,7 +145,6 @@ class Upcapc : public PollingComponent, public UARTDevice {
 	int address = 0;
 	int32_t workonbattery_count;
 	
-
 //=======================================================
 	void calculateParams(unsigned char *frame, unsigned char comm)
 	{
@@ -198,7 +195,11 @@ class Upcapc : public PollingComponent, public UARTDevice {
 //=======================================================
 	void setup() override
 	{
-		this->set_update_interval(interval);	
+		if (interval_ups < 100) {
+			interval_ups = 1000;			// Çàïóñê ñàìîòåñòèðîâàíèÿ
+		};
+
+		this->set_update_interval(interval_ups);	
 		calculateParams(params_estimated_runtime, 0x6a); 	// j 
 		calculateParams(params_input_voltage, 0x4c);		// L
 		calculateParams(params_temperature, 0x43); 			// C
@@ -224,23 +225,21 @@ class Upcapc : public PollingComponent, public UARTDevice {
 
 		calculateParams(params_run_calibration, 0x44);		// D = 44	
 
-
-
 		EEPROM.begin(EEPROM_SIZE);
 		workonbattery_count = EEPROM.readInt(address);
 	}
-	
-	
+		
 	void loop() override {}
 
 	void main_uart_read(uint8_t *command)
 	{
 		std::fill_n(Re_buf, 30, 0);
 		write_array(command, 1);
+
 		delay(100);
 		while (available())
 		{
-			// Ð§Ð¸Ñ‚ÐµÐ½Ð¸Ðµ Ð¸ Ð·Ð°Ð¿Ð¸ÑÑŒ Ð´Ð°Ð½Ð½Ñ‹Ñ… Ð¸Ð· UART
+			// ×èòåíèå è çàïèñü äàííûõ èç UART
 			Re_buf[counter] = read();
 			counter++;
 		}
@@ -250,57 +249,56 @@ class Upcapc : public PollingComponent, public UARTDevice {
 
 	void update() override
 	{
-
 		std::fill_n(Re_buf, 30, 0);
 //===============================================================================================
-// Ð¤ÐžÐ ÐœÐ˜Ð ÐžÐ’ÐÐÐ˜Ð• Ð—ÐÐŸÐ ÐžÐ¡ÐžÐ’
-		ESP_LOGD("apc_ups", "step: %d", step);
+// ÔÎÐÌÈÐÎÂÀÍÈÅ ÇÀÏÐÎÑÎÂ
+		ESP_LOGD("apc_ups", "======================================================================================================== step: %d", step);
 		if (step == 0){
-			main_uart_read(params_smart_mode);				// ÐŸÐ Ð˜Ð’Ð•Ð¢
+			main_uart_read(params_smart_mode);				// ÏÐÈÂÅÒ
 		}
 		
 		if (step == 1){
-			main_uart_read(params_estimated_runtime);		// ÐžÑÑ‚Ð°Ð²ÑˆÐµÐµÑÑ Ð²Ñ€ÐµÐ¼Ñ
+			main_uart_read(params_estimated_runtime);		// Îñòàâøååñÿ âðåìÿ
 		}
 		
 		if (step == 2){
-			main_uart_read(params_input_voltage);			// ÐÐÐŸÐ Ð¯Ð–Ð•ÐÐ˜Ð• Ð²Ñ…Ð¾Ð´
+			main_uart_read(params_input_voltage);			// ÍÀÏÐßÆÅÍÈÅ âõîä
 		}
 
 		if (step == 3){
-			main_uart_read(params_temperature);				// Ð¢ÐµÐ¼Ð¿ÐµÑ€Ð°Ñ‚ÑƒÑ€Ð°
+			main_uart_read(params_temperature);				// Òåìïåðàòóðà
 		}
 
 		if (step == 4) {
-			main_uart_read(params_battery_level);			// Ð—Ð°Ñ€ÑÐ´ Ð±Ð°Ñ‚Ð°Ñ€ÐµÐ¸ Ð² %
+			main_uart_read(params_battery_level);			// Çàðÿä áàòàðåè â %
 		}
 		if (step == 5) {
-			main_uart_read(params_power_load);				// ÐÐ°Ð³Ñ€ÑƒÐ·ÐºÐ°
+			main_uart_read(params_power_load);				// Íàãðóçêà
 		}
 		if (step == 6) {
-			main_uart_read(params_output_voltage);			// ÐÐÐŸÐ Ð¯Ð–Ð•ÐÐ˜Ð• Ð²Ñ‹Ñ…Ð¾Ð´
+			main_uart_read(params_output_voltage);			// ÍÀÏÐßÆÅÍÈÅ âûõîä
 		}
 		if (step == 7) {
-			main_uart_read(params_battery_voltage);			// ÐÐÐŸÐ Ð¯Ð–Ð•ÐÐ˜Ð• Ð±Ð°Ñ‚Ð°Ñ€ÐµÐ¸
+			main_uart_read(params_battery_voltage);			// ÍÀÏÐßÆÅÍÈÅ áàòàðåè
 		}
 		if (step == 8) {
-			main_uart_read(params_line_frequency);			// Ñ‡Ð°ÑÑ‚Ð¾Ñ‚Ð°
+			main_uart_read(params_line_frequency);			// ÷àñòîòà
 		}
 		if (step == 9) {
-			main_uart_read(params_status);					// Bit ÑÑ‚Ð°Ñ‚ÑƒÑ 
+			main_uart_read(params_status);					// Bit ñòàòóñ 
 		}
 		if (step == 10) {
-			main_uart_read(params_last_cause);				// ÐŸÐ¾ÑÐ»ÐµÐ´Ð½Ð¸Ð¹ ÑÐ»ÑƒÑ‡Ð°Ð¹ Ð¾Ñ‚ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¸Ñ
+			main_uart_read(params_last_cause);				// Ïîñëåäíèé ñëó÷àé îòêëþ÷åíèÿ
 		}
 		if (step == 11) {
-			main_uart_read(params_self_test_interval);		// Ð’Ñ€ÐµÐ¼Ñ ÑÐ°Ð¼Ð¾Ñ‚ÐµÑÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ñ
+			main_uart_read(params_self_test_interval);		// Âðåìÿ ñàìîòåñòèðîâàíèÿ
 		}
 
 		if (step == 12) {
-			main_uart_read(params_return_threshold);		// Ð’Ñ€ÐµÐ¼Ñ Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰ÐµÐ½Ð¸Ñ
+			main_uart_read(params_return_threshold);		// Âðåìÿ âîçâðàùåíèÿ
 		}
 		if (step == 13) {
-			main_uart_read(params_grace_delay);				// Ð’Ñ€ÐµÐ¼Ñ Ð² ÑÐµÐºÑƒÐ½Ð´Ð°Ñ… ÑƒÑ…Ð¾Ð´Ð° Ð² soft shutdown
+			main_uart_read(params_grace_delay);				// Âðåìÿ â ñåêóíäàõ óõîäà â soft shutdown
 		}
 		if (step == 14) {
 			main_uart_read(params_wakeup_delay);			// wakeup_delay
@@ -311,12 +309,12 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		
 //**************************** SELF test section*********************************************		
 		if (step == 30) {
-			main_uart_read(params_self_test_run);			// Ð—Ð°Ð¿ÑƒÑÐº ÑÐ°Ð¼Ð¾Ñ‚ÐµÑÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ñ
+			main_uart_read(params_self_test_run);			// Çàïóñê ñàìîòåñòèðîâàíèÿ
 			step = 31;
 		}
 		if (step == 32) {
 			if ((st_cnt > 60) && b_self_test_progress) {
-				main_uart_read(params_self_test_read);			// Ð—Ð°Ð¿ÑƒÑÐº ÑÐ°Ð¼Ð¾Ñ‚ÐµÑÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ñ
+				main_uart_read(params_self_test_read);			// Çàïóñê ñàìîòåñòèðîâàíèÿ
 			}
 			else{
 			step = 1;
@@ -335,14 +333,14 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		
 //**************************** END SELF test section*********************************************		
 		if (step == 40) {
-			main_uart_read(params_run_calibration);			// Ð—Ð°Ð¿ÑƒÑÐº ÑÐ°Ð¼Ð¾Ñ‚ÐµÑÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ñ
+			main_uart_read(params_run_calibration);			// Çàïóñê ñàìîòåñòèðîâàíèÿ
 			step = 41;
 		}
 //**************************** END CALIBRATION*********************************************		
 
 		
 		if (step == 20) {
-			main_uart_read(params_bye);						// ÐŸÐžÐšÐ
+			main_uart_read(params_bye);						// ÏÎÊÀ
 		}
 		//ESP_LOGD("apc_ups", "%d %d %d", params_self_test_interval_set[0], params_self_test_interval_set[1],params_self_test_interval_set[2]);
 		counter = 0;
@@ -350,14 +348,14 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		total_error_cnt++;
 
 //==========================================================================================================
-// ÐŸÐ ÐžÐ’Ð•Ð ÐšÐ ÐŸÐžÐ›Ð£Ð§Ð•ÐÐ«Ð™ Ð”ÐÐÐÐ«Ð¥
+// ÏÐÎÂÅÐÊÀ ÏÎËÓ×ÅÍÛÉ ÄÀÍÍÛÕ
 		if ((step == 0) && (Re_buf[0] == 0x53) && (Re_buf[1] == 0x4d) && (Re_buf[2] == 0x0d) && (Re_buf[3] == 0x0a))		
 		{
 			//ESP_LOGD("apc_ups", "Smart ON");
 			std::fill_n(Re_buf, 30, 0);
 			step = 1;
 			error_cnt=0;
-		}
+		};
 		
 	// estimated_runtime
 		if ((step == 1) && (Re_buf[4] == 0x3a))		
@@ -368,7 +366,9 @@ class Upcapc : public PollingComponent, public UARTDevice {
 				if (Estimated_runtime != nullptr) Estimated_runtime->publish_state(estimated_runtime);
 				error_cnt=0;
 				step=2;
-			};
+		    }else{
+		        ESP_LOGE("apc_ups", "=====  Verification on step %d --> FAILED (Value: %f)", step, estimated_runtime);
+		    };
 		}
 	//input_voltage
 		if ((step == 2) && (Re_buf[5] == 0x0d) && (Re_buf[6] == 0x0a))		
@@ -381,7 +381,9 @@ class Upcapc : public PollingComponent, public UARTDevice {
 				if (Input_voltage != nullptr) Input_voltage->publish_state(input_voltage);
 				error_cnt=0;
 				step=3;
-			};
+		    }else{
+		        ESP_LOGE("apc_ups", "==============================  Verification on step %d --> FAILED (Value: %f)", step, input_voltage);
+		    };
 		}
 	//temperature
 		if ((step == 3) && (Re_buf[5] == 0x0d) && (Re_buf[6] == 0x0a))		
@@ -393,7 +395,9 @@ class Upcapc : public PollingComponent, public UARTDevice {
 				if (Temperature != nullptr) Temperature->publish_state(temperature);
 				error_cnt=0;
 				step=4;
-			};
+		    }else{
+		        ESP_LOGE("apc_ups", "==============================  Verification on step %d --> FAILED (Value: %f)", step, temperature);
+		    };
 		}
 	//battery_level
 		if ((step == 4) && (Re_buf[5] == 0x0d) && (Re_buf[6] == 0x0a))	
@@ -404,7 +408,9 @@ class Upcapc : public PollingComponent, public UARTDevice {
 				if (Battery_level != nullptr) Battery_level->publish_state(battery_level);
 				error_cnt=0;
 				step=5;
-			};
+		    }else{
+		        ESP_LOGE("apc_ups", "==============================  Verification on step %d --> FAILED (Value: %f)", step, battery_level);
+		    };
 		}
 		
 	//power_load
@@ -416,7 +422,9 @@ class Upcapc : public PollingComponent, public UARTDevice {
 				if (Power_load != nullptr) Power_load->publish_state(power_load);
 				error_cnt=0;
 				step=6;
-			};
+		    }else{
+		        ESP_LOGE("apc_ups", "==============================  Verification on step %d --> FAILED (Value: %f)", step, power_load);
+		    };
 		}
 	//output_voltage
 		if ((step == 6) && (Re_buf[5] == 0x0d) && (Re_buf[6] == 0x0a))	
@@ -427,7 +435,9 @@ class Upcapc : public PollingComponent, public UARTDevice {
 				if (Output_voltage != nullptr) Output_voltage->publish_state(output_voltage);
 				error_cnt=0;
 				step=7; 
-			};
+		    }else{
+		        ESP_LOGE("apc_ups", "==============================  Verification on step %d --> FAILED (Value: %f)", step, output_voltage);
+		    };
 		}		
 	//battery_voltage
 		if ((step == 7) && (Re_buf[5] == 0x0d) && (Re_buf[6] == 0x0a))	
@@ -438,7 +448,9 @@ class Upcapc : public PollingComponent, public UARTDevice {
 				if (Battery_voltage != nullptr) Battery_voltage->publish_state(battery_voltage);
 				error_cnt=0;
 				step=8; 
-			};
+		    }else{
+		        ESP_LOGE("apc_ups", "==============================  Verification on step %d --> FAILED (Value: %f)", step, battery_voltage);
+		    };
 		}			
 	//line_frequency
 		if ((step == 8) && (Re_buf[5] == 0x0d) && (Re_buf[6] == 0x0a))	
@@ -449,7 +461,9 @@ class Upcapc : public PollingComponent, public UARTDevice {
 				if (Line_frequency != nullptr) Line_frequency->publish_state(line_frequency);
 				error_cnt=0;
 				step=9; 
-			};
+		    }else{
+		        ESP_LOGE("apc_ups", "==============================  Verification on step %d --> FAILED (Value: %f)", step, line_frequency);
+		    };
 		}			
 	//status bits
 		if ((step == 9) && (Re_buf[2] == 0x0d) && (Re_buf[3] == 0x0a))	
@@ -478,7 +492,9 @@ class Upcapc : public PollingComponent, public UARTDevice {
 				if (Replace_battery != nullptr) Replace_battery->publish_state(replace_battery);
 				error_cnt=0;
 				step=10; 
-			};
+		    }else{
+		        ESP_LOGE("apc_ups", "==============================  Verification on step %d --> FAILED (Value: %i)", step, status);
+		    };
 		}		
 		
 	//last_cause
@@ -506,7 +522,9 @@ class Upcapc : public PollingComponent, public UARTDevice {
 				if (Last_cause != nullptr) Last_cause->publish_state(last_cause.c_str());
 				error_cnt=0;
 				step=11; 
-			};
+		    }else{
+		        ESP_LOGE("apc_ups", "==============================  Verification on step %d --> FAILED (Value: %i)", step, temp_cause);
+		    };
 		}	
 		//params_self_test_interval
 		if ((step == 11) && (Re_buf[3] == 0x0d) && (Re_buf[4] == 0x0a))	
@@ -525,7 +543,9 @@ class Upcapc : public PollingComponent, public UARTDevice {
 				if (Self_test_interval != nullptr) Self_test_interval->publish_state(self_test_interval);
 				step = 12;
 				error_cnt=0;
-			};
+		    }else{
+		        ESP_LOGE("apc_ups", "==============================  Verification on step %d --> FAILED (Value: %f)", step, self_test_interval);
+		    };
 		}	
 		
 	//return_threshold
@@ -537,7 +557,9 @@ class Upcapc : public PollingComponent, public UARTDevice {
 				if (Return_threshold != nullptr) Return_threshold->publish_state(return_threshold);
 				error_cnt=0;
 				step=13; 
-			};
+		    }else{
+		        ESP_LOGE("apc_ups", "==============================  Verification on step %d --> FAILED (Value: %i)", step, return_threshold);
+		    };
 		}				
 		
 	//grace_delay
@@ -549,7 +571,9 @@ class Upcapc : public PollingComponent, public UARTDevice {
 				if (Grace_delay != nullptr) Grace_delay->publish_state(grace_delay);
 				error_cnt=0;
 				step=14; 
-			};
+		    }else{
+		        ESP_LOGE("apc_ups", "==============================  Verification on step %d --> FAILED (Value: %i)", step, grace_delay);
+		    };
 		}			
 	//wakeup_delay
 		if ((step == 14) && (Re_buf[3] == 0x0d) && (Re_buf[4] == 0x0a))	
@@ -560,6 +584,8 @@ class Upcapc : public PollingComponent, public UARTDevice {
 				if (Wakeup_delay != nullptr) Wakeup_delay->publish_state(wakeup_delay);
 				error_cnt=0;
 				step=15; 
+		    }else{
+				ESP_LOGE("apc_ups", "==============================  Verification on step %d --> FAILED (Value: %i)", step, wakeup_delay);
 			};
 		}					
 	//sensitivity
@@ -595,13 +621,11 @@ class Upcapc : public PollingComponent, public UARTDevice {
 
 
 //****************************** SELF TEST**************************************************************		
-
 		if (sw_selftest){ //request self test step
 			step=30; 
 			error_cnt=0;
 			sw_selftest=false;
 		}
-		
 		if ((step == 31) && (Re_buf[2] == 0x0d) && (Re_buf[3] == 0x0a))	{ //wait OK from start self sheck
 			if ((Re_buf[0] == 0x4f) && (Re_buf[1] == 0x4b)) {
 				std::fill_n(Re_buf, 30, 0);
@@ -641,7 +665,6 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		if (Self_test_progress != nullptr) Self_test_progress->publish_state(b_self_test_progress);
 //******************************END SELF TEST**************************************************************		
 
-		
 //****************************** CALIBRATION**************************************************************		
 		if (run_calibration_sw){ //request self test step
 			step=40; 
@@ -656,12 +679,9 @@ class Upcapc : public PollingComponent, public UARTDevice {
 				step = 1;
 			}
 		}
-		
 //****************************** END CALIBRATION**************************************************************		
-
-			
-					
 		if (error_cnt > 5){
+	        ESP_LOGE("apc_ups", "CONNECTION Lost with UPS. Try to send HELLO again");
 			error_cnt=0;
 			step=0;
 		}
@@ -670,9 +690,10 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		}
 
 		if (total_error_cnt > 60){
+	        ESP_LOGE("apc_ups", "CONNECTION Lost with UPS. STATUS go OFFLINE");
 			status = "OFFLINE";
 		}	
-		// Ð¡Ð§Ð•Ð¢Ð§Ð˜Ðš Ð ÐÐ‘ÐžÐ¢Ð« ÐÐ Ð‘ÐÐ¢ÐÐ Ð•Ð•
+		// Ñ×ÅÒ×ÈÊ ÐÀÁÎÒÛ ÍÀ ÁÀÒÀÐÅÅ
 		if (status == "ONLINE") {
 			if (wrk_on_btr == true){
 				status = "ONBATT";
@@ -694,7 +715,6 @@ class Upcapc : public PollingComponent, public UARTDevice {
 		
 		//ESP_LOGD("apc_ups", "step=%d, pv_step=%d, count=%d, tcount=%d, status=%s", step, prev_step,error_cnt,total_error_cnt,status);
 //		ESP_LOGD("apc_ups", "wrk_on_btr=%d, wrk_on_btr_trig=%d, workonbattery_count=%d", wrk_on_btr, wrk_on_btr_trig,workonbattery_count);
-
 	
 		if (status != ""){
 			if (Status != nullptr) Status->publish_state(status.c_str());
@@ -727,12 +747,23 @@ class Run_CalibrationSwitch : public Component, public Switch {
 	public:
 	void setup() override {
 	}
-	
+
 	void write_state(bool state) override {
 		run_calibration_sw = state;
 		publish_state(state);
 	};
+};
+
+class MyCustomFloatOutput: public Component, public FloatOutput {
+	public:
+	void setup() override {
+	}
+	
+	void write_state(float state) override {
+	    int value = state * 100000;
+		interval_ups = value;
+		ESP_LOGD("apc_ups", "New update intervav=%i ms. Restart ESP for apply!",value);
+	};
 
 	
 };
-
